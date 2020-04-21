@@ -5,11 +5,12 @@ from .utils import get_user_id
 
 
 class GoalURLMiddleware(MiddlewareMixin):
+    import pdb; pdb.set_trace()
     def process_request(self, request):
         current_url = request.path
         # does the current URL matches the goal URL for a live experiment?
         experiments = Experiment.objects.filter(
-            goal_url__contains=current_url,
+            #goal_url__contains=current_url,
             status='live'
         )
         if experiments.exists():
