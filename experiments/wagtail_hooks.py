@@ -1,6 +1,7 @@
 from __future__ import absolute_import, unicode_literals
 
-from django.conf.urls import include, url
+from django.conf.urls import include
+from django.urls import path
 from django.contrib.admin.utils import quote
 
 try:
@@ -26,7 +27,7 @@ from .utils import get_user_id, impersonate_other_page
 @hooks.register('register_admin_urls')
 def register_admin_urls():
     return [
-        url(r'^experiments/', include(admin_urls, namespace='experiments')),
+        path('experiments/', include(admin_urls, namespace='experiments')),
     ]
 
 
