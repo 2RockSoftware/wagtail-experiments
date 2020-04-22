@@ -48,7 +48,8 @@ class Experiment(ClusterableModel):
     slug = models.SlugField(max_length=255)
     control_page = models.ForeignKey('wagtailcore.Page', related_name='+', on_delete=models.CASCADE)
     goal = models.ForeignKey('wagtailcore.Page', related_name='+', on_delete=models.SET_NULL, null=True, blank=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
+    goal_url = models.CharField(max_length=255, blank=True, default='')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft', db_index=True)
     winning_variation = models.ForeignKey('wagtailcore.Page', related_name='+', on_delete=models.SET_NULL, null=True)
 
     panels = [
@@ -57,6 +58,7 @@ class Experiment(ClusterableModel):
         PageChooserPanel('control_page'),
         InlinePanel('alternatives', heading=_("Alternatives"), label=_("Alternative")),
         PageChooserPanel('goal'),
+        FieldPanel('goal_url'),
         FieldPanel('status'),
     ]
 
