@@ -9,7 +9,6 @@ from .utils import get_user_id
 
 class GoalURLMiddleware(MiddlewareMixin):
     def process_request(self, request):
-        import pdb; pdb.set_trace()
         current_url = request.PathAndQuery
         # does the current URL matches the goal URL for a live experiment?
         experiments = Experiment.objects.filter(
