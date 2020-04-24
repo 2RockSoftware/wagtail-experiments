@@ -6,9 +6,10 @@ from django.db.models import F, Sum
 
 from experiments.models import ExperimentHistory
 
-
+#TODO: potentially the same session? clearing cookies
 def record_participant(experiment, user_id, variation, request):
     # abort if this user has participated already
+    import pdb; pdb.set_trace()
     experiments_started = request.session.get('experiments_started', [])
     if experiment.id in experiments_started:
         print('user {} has participated in experiment already'.format(user_id))
