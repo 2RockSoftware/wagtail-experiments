@@ -20,6 +20,4 @@ class GoalURLMiddleware(MiddlewareMixin):
             user_id = get_user_id(request)
             for experiment in experiments:
                 experiment.record_completion_for_user(user_id, request)
-        else:
-        # If the current_url is not an experiment's goal_url, then don't do anything
         return None
