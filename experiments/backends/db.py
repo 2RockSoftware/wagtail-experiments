@@ -9,13 +9,10 @@ from experiments.models import ExperimentHistory
 #TODO: potentially the same session? clearing cookies
 def record_participant(experiment, user_id, variation, request):
     # abort if this user has participated already
-    import pdb; pdb.set_trace()
     experiments_started = request.session.get('experiments_started', [])
     if experiment.id in experiments_started:
-        print('user {} has participated in experiment already'.format(user_id))
         return
 
-    print('success: user {} has participated is being recorded in experiment {}'.format(user_id, variation))
     experiments_started.append(experiment.id)
     request.session['experiments_started'] = experiments_started
 
@@ -30,16 +27,13 @@ def record_participant(experiment, user_id, variation, request):
 def record_completion(experiment, user_id, variation, request):
     # abort if this user never started the experiment
     if experiment.id not in request.session.get('experiments_started', []):
-        print('user {} has not started the experiment'.format(user_id))
         return
 
     # abort if this user has completed already
     experiments_completed = request.session.get('experiments_completed', [])
     if experiment.id in experiments_completed:
-        print('user {} has completed experiment already'.format(user_id))
         return
 
-    print('success: user {} has completed the experiment {}'.format(user_id, variation))
     experiments_completed.append(experiment.id)
     request.session['experiments_completed'] = experiments_completed
 
