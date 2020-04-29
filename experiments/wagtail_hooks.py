@@ -110,7 +110,7 @@ def check_experiments(page, request, serve_args, serve_kwargs):
     '''
 
     # If the page being served is the goal page of an experiment, log a completion
-    import pdb; pdb.set_trace()
+
     completed_experiments = Experiment.objects.filter(goal=page, status='live')
 
     if completed_experiments:
@@ -122,13 +122,13 @@ def check_experiments(page, request, serve_args, serve_kwargs):
     # If the page being served is the control page of an experiment, run the experiment
     experiments = Experiment.objects.filter(control_page=page, status__in=('live', 'completed'))
     if experiments:
-        experiment = experiments[0] #Q? Only takes the first experiment?
+        experiment = experiments[0]
 
         if experiment.status == 'completed' and experiment.winning_variation is not None:
             variation = experiment.winning_variation
         else:
             user_id = get_user_id(request)
-            variation = experiment.start_experiment_for_user(user_id, request) #It may never get to this line
+            variation = experiment.start_experiment_for_user(user_id, request)
 
         if variation.pk != page.pk:
             # serve this alternative instead of the current page
