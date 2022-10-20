@@ -3,7 +3,7 @@ from __future__ import absolute_import, unicode_literals
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 
 try:
     from wagtail.admin import messages

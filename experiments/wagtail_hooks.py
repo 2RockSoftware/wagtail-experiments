@@ -9,7 +9,7 @@ try:
 except ImportError:  # fallback for Django <=1.9
     from django.core.urlresolvers import reverse
 
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from experiments import admin_urls
 from wagtail.contrib.modeladmin.helpers import ButtonHelper
 from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
