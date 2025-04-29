@@ -1,16 +1,13 @@
-try:
-    from django.utils.deprecation import MiddlewareMixin
-except ImportError:
-    MiddlewareMixin = object
-
 from .models import Experiment
 from .utils import get_user_id
 
 
-class GoalURLMiddleware(MiddlewareMixin):
-    def process_request(self, request):
+class GoalURLMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
         current_url = request.path
-        # does the current URL matches the goal URL for a live experiment?
         experiments = Experiment.objects.filter(
             goal_url__contains=current_url,
             status='live'
@@ -18,6 +15,8 @@ class GoalURLMiddleware(MiddlewareMixin):
         if experiments.exists():
             # let's complete all experiment that match this URL
             user_id = get_user_id(request)
-            for experiment in experiments:
-                experiment.record_completion_for_user(user_id, request)
-        return None
+            for exp in experiments:
+                exp.record_completion_for_user(user_id, request)
+
+        response = self.get_response(request)
+        return response
