@@ -1,24 +1,13 @@
-from __future__ import absolute_import, unicode_literals
-
-from django.conf.urls import include
-from django.urls import path
+from django.urls import include, re_path
 from django.contrib.admin.utils import quote
-
-try:
-    from django.urls import reverse
-except ImportError:  # fallback for Django <=1.9
-    from django.core.urlresolvers import reverse
+from django.urls import reverse
 
 from django.utils.translation import gettext_lazy as _
 from experiments import admin_urls
 from wagtail.contrib.modeladmin.helpers import ButtonHelper
 from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, EditView
-
-try:
-    from wagtail.core import hooks
-except ImportError:  # fallback for Wagtail <2.0
-    from wagtail.wagtailcore import hooks
+from wagtail import hooks
 
 from .models import Experiment
 from .utils import get_user_id, impersonate_other_page
@@ -27,7 +16,7 @@ from .utils import get_user_id, impersonate_other_page
 @hooks.register('register_admin_urls')
 def register_admin_urls():
     return [
-        path('experiments/', include(admin_urls, namespace='experiments')),
+        re_path(r'^experiments/', include(admin_urls, namespace='experiments')),
     ]
 
 
@@ -57,6 +46,9 @@ class ExperimentButtonHelper(ButtonHelper):
 
 class CreateExperimentView(CreateView):
     def form_valid(self, form):
+        # Called when the creation form is submitted and valid.
+        # If the form's status is "live", then the alternative
+        # draft content is activated
         response = super(CreateExperimentView, self).form_valid(form)
         if form.instance.status == 'live':
             form.instance.activate_alternative_draft_content()
@@ -65,6 +57,9 @@ class CreateExperimentView(CreateView):
 
 class EditExperimentView(EditView):
     def form_valid(self, form):
+        # Called when the edit form is submitted and valid.
+        # If the form's status is changing from "draft" to "live", then
+        # the alternative draft content is activated
         response = super(EditExperimentView, self).form_valid(form)
         if self.instance._initial_status == 'draft' and self.instance.status == 'live':
             self.instance.activate_alternative_draft_content()
@@ -73,6 +68,9 @@ class EditExperimentView(EditView):
 
 
 class ExperimentModelAdmin(ModelAdmin):
+    '''
+        Define the admin interface for experiments via the ModelAdmin app.
+    '''
     model = Experiment
     add_to_settings_menu = True
     button_helper_class = ExperimentButtonHelper
@@ -84,6 +82,23 @@ modeladmin_register(ExperimentModelAdmin)
 
 @hooks.register('before_serve_page')
 def check_experiments(page, request, serve_args, serve_kwargs):
+    '''
+        Check whether the page is a control or goal of an experiment.
+        If the page is a control page, run the experiment.
+        If the page is a goal page, log a completion.
+
+        Args:
+            page:          page being served.
+            request:       django HttpRequest.
+            serve_args:    non-keyword arguments for page being served.
+            serve_kwargs:  keyword arguments for the page being served
+
+        Return:
+            If the page is a control page in a live, yet uncompleted, experiment
+            and the variation page for this user is not the same as the page,
+            then show the variation page. Otherwise, return nothing.
+    '''
+
     # If the page being served is the goal page of an experiment, log a completion
 
     completed_experiments = Experiment.objects.filter(goal=page, status='live')
@@ -110,7 +125,7 @@ def check_experiments(page, request, serve_args, serve_kwargs):
 
             variation = variation.specific
 
-            # hack the title and page-tree-related fields to match the control page
+            # hack the page-tree-related fields to match the control page
             impersonate_other_page(variation, page)
 
             return variation.serve(request, *serve_args, **serve_kwargs)
