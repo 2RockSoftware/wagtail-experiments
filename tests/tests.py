@@ -1,23 +1,15 @@
-from __future__ import absolute_import, unicode_literals
 
+from django import __version__ as DJANGO_VERSION
 from django.contrib.auth.models import User
-
-try:
-    from django.urls import reverse
-except ImportError:  # fallback for Django <=1.9
-    from django.core.urlresolvers import reverse
-
 from django.test import TestCase
-
-try:
-    from wagtail.core.models import Page
-except ImportError:  # fallback for Wagtail <2.0
-    from wagtail.wagtailcore.models import Page
+from django.urls import reverse
+from wagtail.models import Page
 
 from experiments.models import Experiment, ExperimentHistory
 
 
 class TestFrontEndView(TestCase):
+
     fixtures = ['test.json']
 
     def setUp(self):
@@ -59,7 +51,7 @@ class TestFrontEndView(TestCase):
         for x in range(0, 5):
             response = self.client.get('/')
             self.assertEqual(response.status_code, 200)
-            self.assertContains(response, '<p>Welcome to our site! It&#39;s lovely to meet you.</p>')
+            self.assertContains(response, "<p>Welcome to our site! It&#x27;s lovely to meet you.</p>")
             self.assertContains(response, '<a href="http://lovely.example.com/">a lovely link</a>')
 
     def test_participant_is_logged(self):
@@ -289,7 +281,8 @@ class TestFrontEndView(TestCase):
         response = self.client.get('/')
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "<p>Oh, it&#39;s you. What do you want?</p>")
+        self.assertContains(response, "<title>Home</title>")
+        self.assertContains(response, "What do you want?")
 
 
 class TestAdmin(TestCase):
@@ -304,6 +297,8 @@ class TestAdmin(TestCase):
         self.homepage = Page.objects.get(url_path='/home/').specific
         self.homepage_alternative_1 = Page.objects.get(url_path='/home/home-alternative-1/').specific
         self.homepage_alternative_2 = Page.objects.get(url_path='/home/home-alternative-2/').specific
+
+        self.admin_home = reverse('wagtailadmin_home').strip('/')
 
     def get_edit_postdata(self, **kwargs):
         alternatives = self.experiment.alternatives.all()
@@ -336,18 +331,21 @@ class TestAdmin(TestCase):
     def test_experiments_menu_item(self):
         response = self.client.get(reverse('wagtailadmin_home'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'href="/admin/experiments/experiment/"')
+        try:
+            self.assertEqual(response.context_data['page_title'], 'Dashboard')
+        except AssertionError: # fallback for Django <2.0
+            self.assertContains(response, f'href="/{self.admin_home}/experiments/experiment/"')
 
     def test_experiments_index(self):
-        response = self.client.get('/admin/experiments/experiment/')
+        response = self.client.get(f'/{self.admin_home}/experiments/experiment/')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Homepage text')
 
     def test_experiment_new(self):
-        response = self.client.get('/admin/experiments/experiment/create/')
+        response = self.client.get(f'/{self.admin_home}/experiments/experiment/create/')
         self.assertEqual(response.status_code, 200)
 
-        response = self.client.post('/admin/experiments/experiment/create/', {
+        response = self.client.post(f'/{self.admin_home}/experiments/experiment/create/', {
             'name': "Another experiment",
             'slug': 'another-experiment',
             'control_page': self.homepage_alternative_1.pk,
@@ -362,18 +360,18 @@ class TestAdmin(TestCase):
             'goal': self.homepage.pk,
             'status': 'draft',
         })
-        self.assertRedirects(response, '/admin/experiments/experiment/')
+        self.assertRedirects(response, f'/{self.admin_home}/experiments/experiment/')
         self.assertTrue(Experiment.objects.filter(slug='another-experiment').exists())
 
     def test_experiment_edit(self):
-        response = self.client.get('/admin/experiments/experiment/edit/%d/' % self.experiment.pk)
+        response = self.client.get(f'/{self.admin_home}/experiments/experiment/edit/%d/' % self.experiment.pk)
         self.assertEqual(response.status_code, 200)
 
         response = self.client.post(
-            '/admin/experiments/experiment/edit/%d/' % self.experiment.pk,
+            f'/{self.admin_home}/experiments/experiment/edit/{self.experiment.pk}/',
             self.get_edit_postdata(name="Homepage text updated")
         )
-        self.assertRedirects(response, '/admin/experiments/experiment/')
+        self.assertRedirects(response, f'/{self.admin_home}/experiments/experiment/')
         experiment = Experiment.objects.get(pk=self.experiment.pk)
         self.assertEqual(experiment.name, "Homepage text updated")
 
@@ -388,7 +386,7 @@ class TestAdmin(TestCase):
 
         # submit an edit to the experiment, but preserve its live status
         self.client.post(
-            '/admin/experiments/experiment/edit/%d/' % self.experiment.pk,
+            f'/{self.admin_home}/experiments/experiment/edit/{self.experiment.pk}/',
             self.get_edit_postdata()
         )
         # editing an already-live experiment should not update the page content
@@ -397,7 +395,7 @@ class TestAdmin(TestCase):
 
         # make the experiment draft
         self.client.post(
-            '/admin/experiments/experiment/edit/%d/' % self.experiment.pk,
+            f'/{self.admin_home}/experiments/experiment/edit/{self.experiment.pk}/',
             self.get_edit_postdata(status='draft')
         )
         # page content should still be unchanged
@@ -406,7 +404,7 @@ class TestAdmin(TestCase):
 
         # set the experiment from draft to live
         self.client.post(
-            '/admin/experiments/experiment/edit/%d/' % self.experiment.pk,
+            f'/{self.admin_home}/experiments/experiment/edit/{self.experiment.pk}/',
             self.get_edit_postdata(status='live')
         )
         # page content should be updated to follow the draft revision now
@@ -418,8 +416,12 @@ class TestAdmin(TestCase):
         self.homepage_alternative_1.body = 'updated'
         self.homepage_alternative_1.save_revision()
 
+        # live database entry should not have been updated yet
+        homepage_alternative_1 = Page.objects.get(pk=self.homepage_alternative_1.pk).specific
+        self.assertEqual(homepage_alternative_1.body, "Welcome to our site! It's lovely to meet you.")
+
         # create a new experiment with an immediate live status
-        response = self.client.post('/admin/experiments/experiment/create/', {
+        response = self.client.post(f'/{self.admin_home}/experiments/experiment/create/', {
             'name': "Another experiment",
             'slug': 'another-experiment',
             'control_page': self.homepage.pk,
@@ -435,7 +437,7 @@ class TestAdmin(TestCase):
             'status': 'live',
         })
 
-        self.assertRedirects(response, '/admin/experiments/experiment/')
+        self.assertRedirects(response, f'/{self.admin_home}/experiments/experiment/')
 
         # page content should be updated to follow the draft revision now
         homepage_alternative_1 = Page.objects.get(pk=self.homepage_alternative_1.pk).specific
@@ -451,12 +453,12 @@ class TestAdmin(TestCase):
 
         # make the experiment draft
         self.client.post(
-            '/admin/experiments/experiment/edit/%d/' % self.experiment.pk,
+            f'/{self.admin_home}/experiments/experiment/edit/{self.experiment.pk}/',
             self.get_edit_postdata(status='draft')
         )
         # set the experiment from draft to live
         self.client.post(
-            '/admin/experiments/experiment/edit/%d/' % self.experiment.pk,
+            f'/{self.admin_home}/experiments/experiment/edit/{self.experiment.pk}/',
             self.get_edit_postdata(status='live')
         )
 
@@ -473,7 +475,7 @@ class TestAdmin(TestCase):
         self.homepage_alternative_1.save_revision()
 
         # create a new experiment with an immediate live status
-        response = self.client.post('/admin/experiments/experiment/create/', {
+        response = self.client.post(f'/{self.admin_home}/experiments/experiment/create/', {
             'name': "Another experiment",
             'slug': 'another-experiment',
             'control_page': self.homepage.pk,
@@ -489,44 +491,39 @@ class TestAdmin(TestCase):
             'status': 'live',
         })
 
-        self.assertRedirects(response, '/admin/experiments/experiment/')
+        self.assertRedirects(response, f'/{self.admin_home}/experiments/experiment/')
 
         # page content should still be unchanged
         homepage_alternative_1 = Page.objects.get(pk=self.homepage_alternative_1.pk).specific
         self.assertEqual(homepage_alternative_1.body, "Welcome to our site! It's lovely to meet you.")
 
     def test_experiment_delete(self):
-        response = self.client.get('/admin/experiments/experiment/delete/%d/' % self.experiment.pk)
+        response = self.client.get(f'/{self.admin_home}/experiments/experiment/delete/{self.experiment.pk}/')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Are you sure you want to delete this experiment?")
 
-        response = self.client.post('/admin/experiments/experiment/delete/%d/' % self.experiment.pk)
-        self.assertRedirects(response, '/admin/experiments/experiment/')
+        response = self.client.post(f'/{self.admin_home}/experiments/experiment/delete/{self.experiment.pk}/')
+        self.assertRedirects(response, f'/{self.admin_home}/experiments/experiment/')
         self.assertFalse(Experiment.objects.filter(slug='homepage-text').exists())
 
     def test_show_report(self):
-        response = self.client.get('/admin/experiments/experiment/report/%d/' % self.experiment.pk)
+        response = self.client.get(f'/{self.admin_home}/experiments/experiment/report/{self.experiment.pk}/')
         self.assertEqual(response.status_code, 200)
 
     def test_select_winner(self):
         response = self.client.post(
-            '/admin/experiments/experiment/select_winner/%d/%d/' % (
-                self.experiment.pk, self.homepage_alternative_1.pk
-            )
+            f'/{self.admin_home}/experiments/experiment/select_winner/{self.experiment.pk}/{self.homepage_alternative_1.pk}/'
         )
         self.assertRedirects(
             response,
-            '/admin/experiments/experiment/report/%d/' % self.experiment.pk
-        )
+            f'/{self.admin_home}/experiments/experiment/report/{self.experiment.pk}/')
         experiment = Experiment.objects.get(pk=self.experiment.pk)
         self.assertEqual(experiment.status, 'completed')
         self.assertEqual(experiment.winning_variation.pk, self.homepage_alternative_1.pk)
 
     def test_preview(self):
         response = self.client.get(
-            '/admin/experiments/experiment/report/preview/%d/%d/' % (
-                self.experiment.pk, self.homepage_alternative_1.pk
-            )
+            f'/{self.admin_home}/experiments/experiment/report/preview/{self.experiment.pk}/{self.homepage_alternative_2.pk}/'
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "<title>Home</title>")
+        self.assertContains(response, '<title>Home</title>')
